@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mock My Daily Tasks</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f7fa; }
+        header { background: #2d3748; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-container { display: flex; min-height: calc(100vh - 60px); }
+        .sidebar { width: 250px; background: #1a202c; color: #a0aec0; padding: 20px; }
+        .sidebar a { display: block; padding: 12px 15px; color: #a0aec0; text-decoration: none; border-radius: 4px; margin-bottom: 5px; }
+        .sidebar a:hover { background: #2d3748; color: white; }
+        .content { flex-grow: 1; padding: 40px; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { margin-bottom: 8px; font-weight: bold; color: #4a5568; }
+        select, input, textarea { padding: 10px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 1em; }
+        textarea { height: 80px; resize: vertical; }
+        .button-group { display: flex; gap: 15px; }
+        .btn-add { padding: 12px 25px; background: #38a169; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-add:hover { background: #2f855a; }
+        .btn-reset { padding: 12px 25px; background: #e2e8f0; color: #4a5568; border: none; border-radius: 4px; cursor: pointer; }
+        .gridview-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #edf2f7; color: #4a5568; }
+        .success-msg { color: #2f855a; background: #f0fff4; border: 1px solid #c6f6d5; padding: 15px; border-radius: 4px; margin-bottom: 20px; display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>My Daily Tasks (Mock Portal)</h2>
+        <div>Welcome, SM4113</div>
+    </header>
+    <div class="nav-container">
+        <div class="sidebar">
+            <a href="/outsource.html">Back to Outsource</a>
+            <a href="/login.html">Logout</a>
+        </div>
+        <div class="content">
+            <div id="lblMessage" class="success-msg"></div>
+
+            <div class="card">
+                <h3>Daily Task Entry Form</h3>
+                <form id="taskForm" onsubmit="handleAddTask(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="ddlShift">Shift *</label>
+                            <select id="ddlShift" required>
+                                <option value="">--Select Shift--</option>
+                                <option value="Morning Shift">Morning Shift</option>
+                                <option value="Evening Shift">Evening Shift</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ddlWorkType">Work Type *</label>
+                            <select id="ddlWorkType" required>
+                                <option value="">--Select Work Type--</option>
+                                <option value="Programmer/Technical Work Details">Programmer/Technical Work Details</option>
+                                <option value="Data Entry Work">Data Entry Work</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="txtMaxHours">Maximum Hours *</label>
+                            <input type="text" id="txtMaxHours" required placeholder="Maximum Hours">
+                        </div>
+                        <div class="form-group">
+                            <label for="ddlActivityStatus">Activity status *</label>
+                            <select id="ddlActivityStatus" required>
+                                <option value="">--Select Status--</option>
+                                <option value="Completed">Completed</option>
+                                <option value="In Progress">In Progress</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="txtDescription">Description of Activity *</label>
+                        <textarea id="txtDescription" required placeholder="Enter work description"></textarea>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="txtRemarks">Remarks</label>
+                        <input type="text" id="txtRemarks" placeholder="Enter remarks">
+                    </div>
+                    <div class="button-group">
+                        <button type="submit" id="btnAdd" class="btn-add">ADD</button>
+                        <button type="reset" id="btnReset" class="btn-reset">RESET</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="gridview-container">
+                <h3>Task Detail List</h3>
+                <table id="gvTaskDetail">
+                    <thead>
+                        <tr>
+                            <th>Shift</th>
+                            <th>Work Type</th>
+                            <th>Hours</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskTableBody">
+                        <!-- Dynamic rows will appear here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load existing tasks from sessionStorage
+        const savedTasks = JSON.parse(sessionStorage.getItem('tasks') || '[]');
+        renderTable(savedTasks);
+
+        function handleAddTask(event) {
+            event.preventDefault();
+            const shift = document.getElementById('ddlShift').value;
+            const workType = document.getElementById('ddlWorkType').value;
+            const hours = document.getElementById('txtMaxHours').value;
+            const status = document.getElementById('ddlActivityStatus').value;
+            const desc = document.getElementById('txtDescription').value;
+            const remarks = document.getElementById('txtRemarks').value;
+
+            const newTask = { shift, workType, hours, desc, status };
+            savedTasks.push(newTask);
+            sessionStorage.setItem('tasks', JSON.stringify(savedTasks));
+
+            renderTable(savedTasks);
+            
+            const msgLabel = document.getElementById('lblMessage');
+            msgLabel.textContent = "Record Added Successfully!";
+            msgLabel.style.display = "block";
+            
+            // Clear inputs
+            document.getElementById('taskForm').reset();
+            
+            setTimeout(() => {
+                msgLabel.style.display = "none";
+            }, 3000);
+        }
+
+        function renderTable(tasks) {
+            const tbody = document.getElementById('taskTableBody');
+            tbody.innerHTML = '';
+            tasks.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${t.shift}</td>
+                    <td>${t.workType}</td>
+                    <td>${t.hours}</td>
+                    <td>${t.desc}</td>
+                    <td>${t.status}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>

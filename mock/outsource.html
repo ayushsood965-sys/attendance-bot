@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mock Outsource Management</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f7fa; }
+        header { background: #2d3748; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-container { display: flex; height: calc(100vh - 60px); }
+        .sidebar { width: 250px; background: #1a202c; color: #a0aec0; padding: 20px; }
+        .sidebar a { display: block; padding: 12px 15px; color: #a0aec0; text-decoration: none; border-radius: 4px; margin-bottom: 5px; }
+        .sidebar a:hover, .sidebar .active { background: #2d3748; color: white; }
+        .submenu { padding-left: 15px; margin-bottom: 10px; }
+        .submenu a { padding: 8px 15px; font-size: 0.9em; }
+        .content { flex-grow: 1; padding: 40px; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>Outsource Management Module (Mock)</h2>
+        <div>Welcome, SM4113</div>
+    </header>
+    <div class="nav-container">
+        <div class="sidebar">
+            <a href="/dashboard.html">Back to Main Dashboard</a>
+            <div style="font-weight: bold; padding: 10px 15px; color: #4a5568;">Menus</div>
+            <a href="#" id="Masters" onclick="toggleMasters()">Masters ▾</a>
+            <div id="mastersSubmenu" class="submenu" style="display:none;">
+                <a href="/dailytask.html" id="lnkDailyTask">My Daily Task</a>
+            </div>
+            <a href="/login.html">Logout</a>
+        </div>
+        <div class="content">
+            <div class="card">
+                <h3>Outsource Management</h3>
+                <p>Click on "Masters" to expand navigation and click "My Daily Task" to open the task form.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleMasters() {
+            const submenu = document.getElementById('mastersSubmenu');
+            submenu.style.display = submenu.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>

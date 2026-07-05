@@ -1,0 +1,21 @@
+services:
+  attendance-autoloader:
+    build: .
+    container_name: attendance-autoloader
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Kolkata
+      - NODE_ENV=production
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    volumes:
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+    mem_limit: 1g
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

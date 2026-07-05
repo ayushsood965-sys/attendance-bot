@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mock Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f7fa; }
+        header { background: #2d3748; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-container { display: flex; height: calc(100vh - 60px); }
+        .sidebar { width: 250px; background: #1a202c; color: #a0aec0; padding: 20px; }
+        .sidebar a { display: block; padding: 12px 15px; color: #a0aec0; text-decoration: none; border-radius: 4px; margin-bottom: 5px; }
+        .sidebar a:hover { background: #2d3748; color: white; }
+        .content { flex-grow: 1; padding: 40px; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>HPU Backoffice (Mock Portal)</h2>
+        <div>Welcome, SM4113</div>
+    </header>
+    <div class="nav-container">
+        <div class="sidebar">
+            <a href="#" id="btnOutsource" onclick="navigateToOutsource()">Outsource Management</a>
+            <a href="/login.html">Logout</a>
+        </div>
+        <div class="content">
+            <div class="card">
+                <h3>Dashboard Overview</h3>
+                <p>Select Outsource Management from the sidebar menu to proceed.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function navigateToOutsource() {
+            window.location.href = "/outsource.html";
+        }
+    </script>
+</body>
+</html>
