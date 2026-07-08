@@ -10,7 +10,18 @@ try {
     const regex = /const chrome = await launch\([\s\S]*?\}\);/;
     const match = content.match(regex);
     if (match && !content.includes('chrome-stdout.log')) {
-      const replacement = match[0] + `\n  if (chrome.process) {\n    const fs = require('fs');\n    const outLog = fs.createWriteStream('/app/chrome-stdout.log', { flags: 'a' });\n    const errLog = fs.createWriteStream('/app/chrome-stderr.log', { flags: 'a' });\n    chrome.process.stdout.pipe(outLog);\n    chrome.process.stderr.pipe(errLog);\n  }`;
+      const replacement = match[0] + `
+  if (chrome.process) {
+    const fs = require('fs');
+    if (chrome.process.stdout) {
+      const outLog = fs.createWriteStream('/app/chrome-stdout.log', { flags: 'a' });
+      chrome.process.stdout.pipe(outLog);
+    }
+    if (chrome.process.stderr) {
+      const errLog = fs.createWriteStream('/app/chrome-stderr.log', { flags: 'a' });
+      chrome.process.stderr.pipe(errLog);
+    }
+  }`;
       content = content.replace(regex, replacement);
       fs.writeFileSync(libPath, content, 'utf8');
       console.log('Successfully patched puppeteer-real-browser to dump chromium stdout/stderr!');
