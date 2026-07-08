@@ -66,10 +66,36 @@ if (process.platform === 'linux') {
 
         let headedOutput = '';
         try {
-          const out = cp.execSync(`DISPLAY=${activeDisplay} timeout 5s chromium --no-sandbox --disable-gpu --disable-software-rasterizer --version 2>&1`).toString();
-          headedOutput = `Headed test version check: ${out.trim()}`;
+          const proc = cp.spawn('chromium', [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--remote-debugging-port=9333',
+            '--remote-debugging-address=0.0.0.0',
+            'about:blank'
+          ], {
+            env: { ...process.env, DISPLAY: activeDisplay },
+            detached: true
+          });
+          
+          let stdout = '';
+          let stderr = '';
+          proc.stdout.on('data', d => { stdout += d.toString(); });
+          proc.stderr.on('data', d => { stderr += d.toString(); });
+
+          await new Promise(r => setTimeout(r, 4000));
+          
+          let connectRes = '';
+          try {
+            connectRes = cp.execSync('curl -s http://127.0.0.1:9333/json/version 2>&1').toString();
+          } catch (e) {
+            connectRes = `Connection failed: ${e.message}`;
+          }
+          
+          proc.kill('SIGKILL');
+          headedOutput = `Connection: ${connectRes.trim()}\nStdout: ${stdout.trim()}\nStderr: ${stderr.trim()}`;
         } catch (err) {
-          headedOutput = `Headed test failed:\n${err.message}\nOutput:\n${err.stdout?.toString() || err.stderr?.toString()}`;
+          headedOutput = `Headed test failed: ${err.message}`;
         }
 
         res.writeHead(200, { 'Content-Type': 'text/plain' });
