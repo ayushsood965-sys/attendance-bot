@@ -195,6 +195,12 @@ if (process.platform === 'linux') {
             env: { ...process.env, DISPLAY: activeDisplay },
             detached: true
           });
+          
+          let stdout = '';
+          let stderr = '';
+          proc.stdout.on('data', d => { stdout += d.toString(); });
+          proc.stderr.on('data', d => { stderr += d.toString(); });
+
           await new Promise(r => setTimeout(r, 2000));
           let res = '';
           try {
@@ -204,7 +210,7 @@ if (process.platform === 'linux') {
             res = `failed: ${e.message}`;
           }
           proc.kill('SIGKILL');
-          testRealFlags = res.includes('Browser') ? 'Success' : `Failed: ${res.trim()}`;
+          testRealFlags = `Connection: ${res.trim()}\nStdout: ${stdout.trim()}\nStderr: ${stderr.trim()}`;
         } catch (e) {
           testRealFlags = `Error: ${e.message}`;
         }
