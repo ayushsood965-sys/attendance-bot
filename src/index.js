@@ -8,7 +8,24 @@ const { closeBrowser } = require('./browser');
 // Start a simple HTTP health check server on Linux to satisfy Coolify/Traefik routing checks
 if (process.platform === 'linux') {
   const http = require('http');
+  const fs = require('fs');
   http.createServer((req, res) => {
+    if (req.url === '/diagnostics') {
+      try {
+        const filePath = '/app/diagnostics.log';
+        if (fs.existsSync(filePath)) {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end(fs.readFileSync(filePath, 'utf8'));
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('Diagnostics log not found yet');
+        }
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`Error: ${e.message}`);
+      }
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('healthy');
   }).listen(process.env.PORT || 3000, () => {
@@ -33,49 +50,67 @@ if (dryRun) {
  * Main application entry point
  */
 async function main() {
-  logger.info('=== RUNNING DIAGNOSTICS ===');
+  const fs = require('fs');
+  const cp = require('child_process');
+  
+  let diag = [];
+  function diagLog(msg) {
+    logger.info(msg);
+    diag.push(msg);
+  }
+  function diagWarn(msg) {
+    logger.warn(msg);
+    diag.push(`[WARN] ${msg}`);
+  }
+
+  diagLog('=== RUNNING DIAGNOSTICS ===');
   try {
-    const cp = require('child_process');
-    logger.info(`Platform: ${process.platform}`);
-    logger.info(`User: ${process.env.USER || 'unknown'} (UID: ${process.getuid ? process.getuid() : 'N/A'})`);
-    logger.info(`Env DISPLAY: ${process.env.DISPLAY}`);
+    diagLog(`Platform: ${process.platform}`);
+    diagLog(`User: ${process.env.USER || 'unknown'} (UID: ${process.getuid ? process.getuid() : 'N/A'})`);
+    diagLog(`Env DISPLAY: ${process.env.DISPLAY}`);
     
     // Check files in /tmp
     try {
       const tmpFiles = cp.execSync('ls -la /tmp /tmp/.X11-unix 2>&1').toString();
-      logger.info(`Files in /tmp & /tmp/.X11-unix:\n${tmpFiles}`);
+      diagLog(`Files in /tmp & /tmp/.X11-unix:\n${tmpFiles}`);
     } catch (e) {
-      logger.warn(`Failed to list /tmp: ${e.message}`);
+      diagWarn(`Failed to list /tmp: ${e.message}`);
     }
 
     // Check running processes
     try {
       const processes = cp.execSync('ps aux 2>&1 || ps -ef 2>&1').toString();
-      logger.info(`Running processes:\n${processes}`);
+      diagLog(`Running processes:\n${processes}`);
     } catch (e) {
-      logger.warn(`Failed to list processes: ${e.message}`);
+      diagWarn(`Failed to list processes: ${e.message}`);
     }
 
     // Check chromium path
     try {
       const chromVersion = cp.execSync('chromium --version 2>&1 || google-chrome --version 2>&1').toString();
-      logger.info(`Chromium version: ${chromVersion.trim()}`);
+      diagLog(`Chromium version: ${chromVersion.trim()}`);
     } catch (e) {
-      logger.warn(`Failed to get chromium version: ${e.message}`);
+      diagWarn(`Failed to get chromium version: ${e.message}`);
     }
 
     // Try starting a test Xvfb and chromium to see why it crashes
     try {
-      logger.info('Testing manual chromium launch...');
+      diagLog('Testing manual chromium launch...');
       const output = cp.execSync('chromium --headless --no-sandbox --disable-gpu --dump-dom https://www.google.com 2>&1').toString();
-      logger.info(`Test chromium headless fetch succeeded! Length: ${output.length}`);
+      diagLog(`Test chromium headless fetch succeeded! Length: ${output.length}`);
     } catch (e) {
-      logger.warn(`Test chromium headless fetch failed: ${e.message}\nOutput: ${e.stdout?.toString() || e.stderr?.toString()}`);
+      diagWarn(`Test chromium headless fetch failed: ${e.message}\nOutput: ${e.stdout?.toString() || e.stderr?.toString()}`);
     }
   } catch (err) {
-    logger.error('Diagnostics error:', err);
+    diagLog(`Diagnostics error: ${err.message}`);
   }
-  logger.info('=== END DIAGNOSTICS ===');
+  diagLog('=== END DIAGNOSTICS ===');
+
+  try {
+    fs.writeFileSync('/app/diagnostics.log', diag.join('\n'));
+  } catch (err) {
+    logger.error('Failed to write diagnostics log file:', err);
+  }
 
   logger.info('');
   logger.info('╔══════════════════════════════════════════════════╗');
