@@ -29,7 +29,7 @@ const { closeBrowser } = require('./browser');
 if (process.platform === 'linux') {
   const http = require('http');
   const fs = require('fs');
-  http.createServer((req, res) => {
+  http.createServer(async (req, res) => {
     if (req.url === '/diagnostics') {
       try {
         const filePath = '/app/diagnostics.log';
