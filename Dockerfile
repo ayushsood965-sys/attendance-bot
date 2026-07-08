@@ -21,6 +21,11 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
+    libegl1 \
+    libgl1 \
+    libglx-mesa0 \
+    libgles2 \
+    libxshmfence1 \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 

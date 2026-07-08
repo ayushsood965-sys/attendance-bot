@@ -34,6 +34,8 @@ async function launchBrowser() {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--remote-debugging-address=0.0.0.0',
+      '--disable-gpu',
+      '--disable-software-rasterizer',
     ],
 
     customConfig: {
