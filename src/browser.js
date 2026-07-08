@@ -105,6 +105,15 @@ async function takeScreenshot(page, name) {
 
     await page.screenshot({ path: filepath, fullPage: true });
     logger.info(`Screenshot saved: ${filename}`);
+
+    try {
+      const fs = require('fs');
+      const latestPath = path.resolve(config.screenshotDir, 'latest.png');
+      fs.copyFileSync(filepath, latestPath);
+    } catch (e) {
+      logger.debug(`Failed to copy latest screenshot: ${e.message}`);
+    }
+
     return filepath;
   } catch (error) {
     logger.warn(`Screenshot failed: ${error.message}`);
