@@ -33,9 +33,11 @@ async function launchBrowser() {
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
+      '--remote-debugging-address=0.0.0.0',
     ],
 
     customConfig: {
+      logLevel: 'verbose',
       dumpio: true,
       ...(process.platform === 'linux' ? { chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium' } : {}),
     },
