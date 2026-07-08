@@ -110,71 +110,115 @@ async function navigateToForm(page) {
 
   formFrame = targetContext;
 
-  // Step 4: Hover over Masters to reveal the submenu
-  logger.info('  Hovering over Masters menu...');
-  const mastersBox = await mastersHandle.boundingBox();
-  if (!mastersBox) {
-    throw new Error('Could not get bounding box for Masters menu');
+  // Step 4: Click Masters to expand the submenu
+  logger.info('  Clicking Masters menu via JavaScript...');
+  
+  // Try JavaScript click first — it never hangs unlike mouse operations
+  const mastersClicked = await page.evaluate(() => {
+    const els = document.querySelectorAll('a, li, span, div, button');
+    for (const el of els) {
+      const text = el.textContent?.trim() || '';
+      if (text === 'Masters' || text === 'Masters ') {
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  });
+  
+  if (mastersClicked) {
+    logger.info('  ✅ Masters clicked via JS');
+  } else {
+    // Fallback: try mouse click
+    logger.info('  JS click failed, trying mouse hover+click...');
+    const mastersBox = await mastersHandle.boundingBox();
+    if (mastersBox) {
+      await page.mouse.move(mastersBox.x + mastersBox.width / 2, mastersBox.y + mastersBox.height / 2);
+      await humanDelay(300, 500);
+      await page.mouse.click(mastersBox.x + mastersBox.width / 2, mastersBox.y + mastersBox.height / 2);
+    }
   }
   
-  // Move mouse to the center of Masters menu item
-  const mx = mastersBox.x + mastersBox.width / 2;
-  const my = mastersBox.y + mastersBox.height / 2;
-  await page.mouse.move(mx, my);
-  await humanDelay(500, 1000);
-
-  // Click it as well (some submenus expand on click instead of hover)
-  await page.mouse.click(mx, my);
-  await humanDelay(1500, 2500);
+  await humanDelay(2000, 3000);
   await takeScreenshot(page, 'nav_masters_interacted');
 
-  // Step 5: Wait for "My Daily Task" to be visible / clickable
-  logger.info('  Waiting for My Daily Task link to appear...');
-  const taskHandle = await targetContext.waitForFunction(() => {
+  // Step 5: Find "My Daily Task" link and get its href or click it via JS
+  logger.info('  Looking for My Daily Task link...');
+  
+  // Wait for submenu to render
+  await humanDelay(1000, 2000);
+  
+  // Try to find the link and extract its href for direct navigation
+  const taskLinkInfo = await page.evaluate(() => {
     const links = document.querySelectorAll('a');
     for (const l of links) {
-      const text = l.textContent?.trim()?.toLowerCase();
-      if (text?.includes('daily task') || text?.includes('my daily') || text?.includes('mydailytask')) {
-        // Must be visible
-        if (l.offsetParent !== null || l.offsetWidth > 0 || l.offsetHeight > 0) return l;
+      const text = l.textContent?.trim()?.toLowerCase() || '';
+      if (text.includes('daily task') || text.includes('my daily') || text.includes('mydailytask')) {
+        return { href: l.href, text: l.textContent.trim(), hasHref: !!l.href && l.href !== '#' && !l.href.startsWith('javascript:') };
       }
     }
     return null;
-  }, { timeout: 10000 }).then(h => h.asElement()).catch(() => null);
+  });
 
-  if (!taskHandle) {
-    throw new Error('Submenu "My Daily Task" not visible after expanding Masters');
+  if (!taskLinkInfo) {
+    // Maybe the submenu needs a hover to become visible — dispatch mouseover events
+    logger.info('  My Daily Task not found yet. Dispatching hover events on Masters...');
+    await page.evaluate(() => {
+      const els = document.querySelectorAll('a, li, span, div, button');
+      for (const el of els) {
+        const text = el.textContent?.trim() || '';
+        if (text === 'Masters' || text === 'Masters ') {
+          el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+          el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+          break;
+        }
+      }
+    });
+    await humanDelay(2000, 3000);
   }
 
-  // Step 6: Smoothly slide the mouse from Masters to My Daily Task so hover stays active
-  const taskBox = await taskHandle.boundingBox();
-  if (!taskBox) {
-    throw new Error('Could not get bounding box for My Daily Task submenu item');
+  // Try again after hover events
+  const taskLinkInfo2 = taskLinkInfo || await page.evaluate(() => {
+    const links = document.querySelectorAll('a');
+    for (const l of links) {
+      const text = l.textContent?.trim()?.toLowerCase() || '';
+      if (text.includes('daily task') || text.includes('my daily') || text.includes('mydailytask')) {
+        return { href: l.href, text: l.textContent.trim(), hasHref: !!l.href && l.href !== '#' && !l.href.startsWith('javascript:') };
+      }
+    }
+    return null;
+  });
+
+  if (!taskLinkInfo2) {
+    throw new Error('Could not find "My Daily Task" link after expanding Masters');
   }
 
-  const tx = taskBox.x + taskBox.width / 2;
-  const ty = taskBox.y + taskBox.height / 2;
-  
-  logger.info(`  Sliding mouse from (${mx}, ${my}) to (${tx}, ${ty})...`);
-  // Move mouse in small steps to prevent leaving the active hover zone
-  await page.mouse.move(tx, ty, { steps: 15 });
-  await humanDelay(300, 600);
+  logger.info(`  Found: "${taskLinkInfo2.text}" (hasHref: ${taskLinkInfo2.hasHref})`);
 
-  // Step 7: Click My Daily Task
-  logger.info('  Clicking My Daily Task...');
-  // Use Promise.race so we don't hang if the click triggers a navigation
-  await Promise.race([
-    Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {}),
-      page.mouse.click(tx, ty),
-    ]),
-    new Promise(r => setTimeout(r, 5000)),
-  ]);
-  logger.info('  My Daily Task clicked, waiting for form...');
-  await humanDelay(2000, 3000);
+  if (taskLinkInfo2.hasHref) {
+    // Direct navigation — most reliable, avoids all hover/click issues
+    logger.info(`  Navigating directly to: ${taskLinkInfo2.href}`);
+    await page.goto(taskLinkInfo2.href, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+  } else {
+    // Click via JavaScript
+    logger.info('  Clicking My Daily Task via JavaScript...');
+    await page.evaluate(() => {
+      const links = document.querySelectorAll('a');
+      for (const l of links) {
+        const text = l.textContent?.trim()?.toLowerCase() || '';
+        if (text.includes('daily task') || text.includes('my daily') || text.includes('mydailytask')) {
+          l.click();
+          return;
+        }
+      }
+    });
+  }
+
+  logger.info('  My Daily Task triggered, waiting for form...');
+  await humanDelay(3000, 5000);
 
   // Wait for form to load
-  await waitForFormElements(formFrame);
+  await waitForFormElements(page);
   await takeScreenshot(page, 'daily_task_form_loaded');
   logger.info('Daily Task form loaded successfully ✅');
 }
