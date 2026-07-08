@@ -98,8 +98,52 @@ if (process.platform === 'linux') {
           headedOutput = `Headed test failed: ${err.message}`;
         }
 
+        let testUserDirTmp = '';
+        try {
+          const proc = cp.spawn('chromium', [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--remote-debugging-port=9444',
+            '--remote-debugging-address=0.0.0.0',
+            '--user-data-dir=/tmp/test-user-dir',
+            'about:blank'
+          ], {
+            env: { ...process.env, DISPLAY: activeDisplay },
+            detached: true
+          });
+          await new Promise(r => setTimeout(r, 2000));
+          const res = cp.execSync('curl -s http://127.0.0.1:9444/json/version 2>&1 || echo "failed"').toString();
+          proc.kill('SIGKILL');
+          testUserDirTmp = res.includes('DevTools') ? 'Success' : `Failed: ${res.trim()}`;
+        } catch (e) {
+          testUserDirTmp = `Error: ${e.message}`;
+        }
+
+        let testUserDirApp = '';
+        try {
+          const proc = cp.spawn('chromium', [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--remote-debugging-port=9555',
+            '--remote-debugging-address=0.0.0.0',
+            '--user-data-dir=/app/test-user-dir',
+            'about:blank'
+          ], {
+            env: { ...process.env, DISPLAY: activeDisplay },
+            detached: true
+          });
+          await new Promise(r => setTimeout(r, 2000));
+          const res = cp.execSync('curl -s http://127.0.0.1:9555/json/version 2>&1 || echo "failed"').toString();
+          proc.kill('SIGKILL');
+          testUserDirApp = res.includes('DevTools') ? 'Success' : `Failed: ${res.trim()}`;
+        } catch (e) {
+          testUserDirApp = `Error: ${e.message}`;
+        }
+
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end(`Processes:\n${processes}\n\nFiles:\n${tmpFiles}\n\nActive Display: ${activeDisplay}\n\nHeadless Test Output:\n${testOutput}\n\nHeaded Test Output:\n${headedOutput}`);
+        res.end(`Processes:\n${processes}\n\nFiles:\n${tmpFiles}\n\nActive Display: ${activeDisplay}\n\nHeadless Test Output:\n${testOutput}\n\nHeaded Test Output:\n${headedOutput}\n\nUser Data Dir Tmp Test: ${testUserDirTmp}\nUser Data Dir App Test: ${testUserDirApp}`);
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end(`Error: ${e.message}`);
