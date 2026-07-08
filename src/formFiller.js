@@ -284,18 +284,30 @@ async function fillForm(page, shift, taskData) {
 
     const shiftSelected = await selectDropdown(context, 'Shift', shiftText);
     if (!shiftSelected) {
-      // Check if it's because no options are available (time constraints)
-      const optionsCount = await context.evaluate(() => {
+      // The desired shift option is not in the dropdown — try to select
+      // any available non-default option (e.g. "Extra work") so the form
+      // can still be submitted.
+      logger.warn(`  ⚠️ Shift option "${shiftText}" not found. Attempting fallback to any available option...`);
+      const fallback = await context.evaluate(() => {
         const sel = document.querySelector('select[id*="Shift" i], select[id*="shift" i]');
-        return sel ? sel.options.length : 0;
+        if (!sel) return { error: 'No shift select element found' };
+        // Pick first option whose text is not the default placeholder
+        for (let i = 0; i < sel.options.length; i++) {
+          const text = sel.options[i].text.trim().toLowerCase();
+          if (text && !text.includes('select') && !text.startsWith('-')) {
+            sel.selectedIndex = i;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            return { selected: sel.options[i].text.trim() };
+          }
+        }
+        return { error: 'No non-default options available', available: Array.from(sel.options).map(o => o.text.trim()) };
       });
-      
-      if (optionsCount <= 1) {
-        logger.warn(`  ⚠️ Shift option "${shiftText}" is not visible in the dropdown. HPU time constraints: Morning shift is only active between 11 AM - 1 PM, Evening shift between 2 PM - 5 PM. Current time is outside these windows.`);
-        logger.info('  ℹ️ Skipping submission successfully due to portal time constraints.');
-        return true; // Exit cleanly
+
+      if (fallback.error) {
+        logger.warn(`  ⚠️ ${fallback.error} (available: ${fallback.available?.join(', ')}). Skipping due to portal time constraints.`);
+        return true; // Exit cleanly — portal time window issue
       }
-      throw new Error(`Failed to select Shift dropdown (option "${shiftText}" not found)`);
+      logger.info(`  ✅ Fallback: selected "${fallback.selected}" instead of "${shiftText}"`);
     }
     await humanDelay(500, 1000);
     // Wait for possible ASP.NET postback after shift change
