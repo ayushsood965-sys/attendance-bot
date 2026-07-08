@@ -34,7 +34,10 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     DISPLAY=:99 \
     TZ=Asia/Kolkata \
-    NODE_ENV=production
+    NODE_ENV=production \
+    HOME=/app \
+    XDG_CONFIG_HOME=/app/.config \
+    XDG_CACHE_HOME=/app/.cache
 
 # Create app directory
 WORKDIR /app
