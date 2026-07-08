@@ -22,6 +22,50 @@ if (dryRun) {
  * Main application entry point
  */
 async function main() {
+  logger.info('=== RUNNING DIAGNOSTICS ===');
+  try {
+    const cp = require('child_process');
+    logger.info(`Platform: ${process.platform}`);
+    logger.info(`User: ${process.env.USER || 'unknown'} (UID: ${process.getuid ? process.getuid() : 'N/A'})`);
+    logger.info(`Env DISPLAY: ${process.env.DISPLAY}`);
+    
+    // Check files in /tmp
+    try {
+      const tmpFiles = cp.execSync('ls -la /tmp /tmp/.X11-unix 2>&1').toString();
+      logger.info(`Files in /tmp & /tmp/.X11-unix:\n${tmpFiles}`);
+    } catch (e) {
+      logger.warn(`Failed to list /tmp: ${e.message}`);
+    }
+
+    // Check running processes
+    try {
+      const processes = cp.execSync('ps aux 2>&1 || ps -ef 2>&1').toString();
+      logger.info(`Running processes:\n${processes}`);
+    } catch (e) {
+      logger.warn(`Failed to list processes: ${e.message}`);
+    }
+
+    // Check chromium path
+    try {
+      const chromVersion = cp.execSync('chromium --version 2>&1 || google-chrome --version 2>&1').toString();
+      logger.info(`Chromium version: ${chromVersion.trim()}`);
+    } catch (e) {
+      logger.warn(`Failed to get chromium version: ${e.message}`);
+    }
+
+    // Try starting a test Xvfb and chromium to see why it crashes
+    try {
+      logger.info('Testing manual chromium launch...');
+      const output = cp.execSync('chromium --headless --no-sandbox --disable-gpu --dump-dom https://www.google.com 2>&1').toString();
+      logger.info(`Test chromium headless fetch succeeded! Length: ${output.length}`);
+    } catch (e) {
+      logger.warn(`Test chromium headless fetch failed: ${e.message}\nOutput: ${e.stdout?.toString() || e.stderr?.toString()}`);
+    }
+  } catch (err) {
+    logger.error('Diagnostics error:', err);
+  }
+  logger.info('=== END DIAGNOSTICS ===');
+
   logger.info('');
   logger.info('╔══════════════════════════════════════════════════╗');
   logger.info('║     HPU Backoffice - Attendance Autoloader       ║');
