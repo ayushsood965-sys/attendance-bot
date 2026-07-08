@@ -27,6 +27,9 @@ async function launchBrowser() {
     // Enable automatic Cloudflare Turnstile solving
     turnstile: true,
 
+    // Ignore default experimental chrome-launcher flags that cause container crashes
+    ignoreAllFlags: true,
+
     args: [
       '--window-size=1366,768',
       '--lang=en-IN',
