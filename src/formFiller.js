@@ -162,8 +162,16 @@ async function navigateToForm(page) {
 
   // Step 7: Click My Daily Task
   logger.info('  Clicking My Daily Task...');
-  await page.mouse.click(tx, ty);
-  await handleNavigation(page);
+  // Use Promise.race so we don't hang if the click triggers a navigation
+  await Promise.race([
+    Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {}),
+      page.mouse.click(tx, ty),
+    ]),
+    new Promise(r => setTimeout(r, 5000)),
+  ]);
+  logger.info('  My Daily Task clicked, waiting for form...');
+  await humanDelay(2000, 3000);
 
   // Wait for form to load
   await waitForFormElements(formFrame);
@@ -620,8 +628,8 @@ async function clickButtonByText(frame, text) {
 async function handleNavigation(page) {
   try {
     await Promise.race([
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }),
-      new Promise(r => setTimeout(r, 8000)),
+      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 }),
+      new Promise(r => setTimeout(r, 3000)),
     ]);
   } catch (e) { /* ignore timeout */ }
   await humanDelay(1000, 2000);
