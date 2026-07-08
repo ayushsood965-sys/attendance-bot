@@ -1,5 +1,25 @@
 require('dotenv').config();
 
+// Dynamically patch puppeteer-real-browser to redirect chromium stdout/stderr to files
+try {
+  const fs = require('fs');
+  const path = require('path');
+  const libPath = path.join(__dirname, '../node_modules/puppeteer-real-browser/lib/cjs/index.js');
+  if (fs.existsSync(libPath)) {
+    let content = fs.readFileSync(libPath, 'utf8');
+    const regex = /const chrome = await launch\([\s\S]*?\}\);/;
+    const match = content.match(regex);
+    if (match && !content.includes('chrome-stdout.log')) {
+      const replacement = match[0] + `\n  if (chrome.process) {\n    const fs = require('fs');\n    const outLog = fs.createWriteStream('/app/chrome-stdout.log', { flags: 'a' });\n    const errLog = fs.createWriteStream('/app/chrome-stderr.log', { flags: 'a' });\n    chrome.process.stdout.pipe(outLog);\n    chrome.process.stderr.pipe(errLog);\n  }`;
+      content = content.replace(regex, replacement);
+      fs.writeFileSync(libPath, content, 'utf8');
+      console.log('Successfully patched puppeteer-real-browser to dump chromium stdout/stderr!');
+    }
+  }
+} catch (e) {
+  console.error('Failed to patch puppeteer-real-browser:', e);
+}
+
 const config = require('./config');
 const logger = require('./logger');
 const { startScheduler, executeTask } = require('./scheduler');
@@ -54,6 +74,38 @@ if (process.platform === 'linux') {
         }
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end(logContent || 'No chrome-err.log found');
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`Error: ${e.message}`);
+      }
+      return;
+    }
+    if (req.url === '/chrome-stdout') {
+      try {
+        const filePath = '/app/chrome-stdout.log';
+        if (fs.existsSync(filePath)) {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end(fs.readFileSync(filePath, 'utf8'));
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('No chrome-stdout.log found');
+        }
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`Error: ${e.message}`);
+      }
+      return;
+    }
+    if (req.url === '/chrome-stderr') {
+      try {
+        const filePath = '/app/chrome-stderr.log';
+        if (fs.existsSync(filePath)) {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end(fs.readFileSync(filePath, 'utf8'));
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('No chrome-stderr.log found');
+        }
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end(`Error: ${e.message}`);
