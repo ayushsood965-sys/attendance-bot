@@ -124,7 +124,7 @@ async function navigateToForm(page) {
   await humanDelay(500, 1000);
 
   // Click it as well (some submenus expand on click instead of hover)
-  await mastersHandle.click().catch(() => {});
+  await page.mouse.click(mx, my);
   await humanDelay(1500, 2500);
   await takeScreenshot(page, 'nav_masters_interacted');
 
