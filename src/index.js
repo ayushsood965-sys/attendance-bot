@@ -51,8 +51,29 @@ if (process.platform === 'linux') {
         const cp = require('child_process');
         const processes = cp.execSync('ps aux 2>&1 || ps -ef 2>&1').toString();
         const tmpFiles = cp.execSync('ls -la /tmp /tmp/.X11-unix 2>&1').toString();
+        
+        // Find active display
+        const displays = fs.readdirSync('/tmp/.X11-unix').map(f => f.replace('X', ':'));
+        const activeDisplay = displays.length > 0 ? displays[0] : ':99';
+        
+        let testOutput = '';
+        try {
+          const out = cp.execSync(`DISPLAY=${activeDisplay} chromium --headless=new --no-sandbox --disable-gpu --disable-software-rasterizer --dump-dom https://www.google.com 2>&1`).toString();
+          testOutput = `Headless test fetch succeeded! Length: ${out.length}`;
+        } catch (err) {
+          testOutput = `Headless test fetch failed:\n${err.message}\nOutput:\n${err.stdout?.toString() || err.stderr?.toString()}`;
+        }
+
+        let headedOutput = '';
+        try {
+          const out = cp.execSync(`DISPLAY=${activeDisplay} timeout 5s chromium --no-sandbox --disable-gpu --disable-software-rasterizer --version 2>&1`).toString();
+          headedOutput = `Headed test version check: ${out.trim()}`;
+        } catch (err) {
+          headedOutput = `Headed test failed:\n${err.message}\nOutput:\n${err.stdout?.toString() || err.stderr?.toString()}`;
+        }
+
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end(`Processes:\n${processes}\n\nFiles:\n${tmpFiles}`);
+        res.end(`Processes:\n${processes}\n\nFiles:\n${tmpFiles}\n\nActive Display: ${activeDisplay}\n\nHeadless Test Output:\n${testOutput}\n\nHeaded Test Output:\n${headedOutput}`);
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end(`Error: ${e.message}`);
