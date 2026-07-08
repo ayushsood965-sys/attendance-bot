@@ -40,8 +40,6 @@ async function launchBrowser() {
       ...(process.platform === 'linux' ? { chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium' } : {}),
     },
 
-    disableXvfb: true,
-
     // Stealth fingerprint settings
     fingerprint: true,
 
