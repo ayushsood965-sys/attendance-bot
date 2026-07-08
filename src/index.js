@@ -155,8 +155,62 @@ if (process.platform === 'linux') {
           testUserDirApp = `Error: ${e.message}`;
         }
 
+        let testRealFlags = '';
+        try {
+          const proc = cp.spawn('chromium', [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--remote-debugging-address=0.0.0.0',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-features=Translate,OptimizationHints,MediaRouter,DialMediaRouteProvider,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,CertificateTransparencyComponentUpdater,AutofillServerCommunication,PrivacySandboxSettings4,RenderDocument,AutomationControlled',
+            '--disable-extensions',
+            '--disable-component-extensions-with-background-pages',
+            '--disable-background-networking',
+            '--disable-client-side-phishing-detection',
+            '--disable-sync',
+            '--metrics-recording-only',
+            '--disable-default-apps',
+            '--mute-audio',
+            '--no-default-browser-check',
+            '--no-first-run',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-background-timer-throttling',
+            '--disable-ipc-flooding-protection',
+            '--password-store=basic',
+            '--use-mock-keychain',
+            '--force-fieldtrials=*BackgroundTracing/default/',
+            '--disable-hang-monitor',
+            '--disable-prompt-on-repost',
+            '--disable-domain-reliability',
+            '--propagate-iph-for-testing',
+            '--window-size=1366,768',
+            '--lang=en-IN',
+            '--user-data-dir=/tmp/test-real-flags',
+            '--remote-debugging-port=9666',
+            'about:blank'
+          ], {
+            env: { ...process.env, DISPLAY: activeDisplay },
+            detached: true
+          });
+          await new Promise(r => setTimeout(r, 2000));
+          let res = '';
+          try {
+            const fetchRes = await fetch('http://127.0.0.1:9666/json/version');
+            res = await fetchRes.text();
+          } catch (e) {
+            res = `failed: ${e.message}`;
+          }
+          proc.kill('SIGKILL');
+          testRealFlags = res.includes('Browser') ? 'Success' : `Failed: ${res.trim()}`;
+        } catch (e) {
+          testRealFlags = `Error: ${e.message}`;
+        }
+
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end(`Processes:\n${processes}\n\nFiles:\n${tmpFiles}\n\nActive Display: ${activeDisplay}\n\nHeadless Test Output:\n${testOutput}\n\nHeaded Test Output:\n${headedOutput}\n\nUser Data Dir Tmp Test: ${testUserDirTmp}\nUser Data Dir App Test: ${testUserDirApp}`);
+        res.end(`Processes:\n${processes}\n\nFiles:\n${tmpFiles}\n\nActive Display: ${activeDisplay}\n\nHeadless Test Output:\n${testOutput}\n\nHeaded Test Output:\n${headedOutput}\n\nUser Data Dir Tmp Test: ${testUserDirTmp}\nUser Data Dir App Test: ${testUserDirApp}\nReal Flags Test: ${testRealFlags}`);
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end(`Error: ${e.message}`);
