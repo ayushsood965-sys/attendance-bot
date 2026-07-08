@@ -148,7 +148,14 @@ async function waitForCloudflare(page, maxWait = 30000) {
   const startTime = Date.now();
 
   while (Date.now() - startTime < maxWait) {
-    const pageContent = await page.evaluate(() => document.body?.innerText || '');
+    let pageContent = '';
+    try {
+      pageContent = await page.evaluate(() => document.body?.innerText || '');
+    } catch (e) {
+      logger.debug(`Navigation in progress or context destroyed (${e.message}), retrying...`);
+      await humanDelay(1000, 2000);
+      continue;
+    }
 
     // Check if still on Cloudflare challenge
     if (
