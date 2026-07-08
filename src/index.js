@@ -87,7 +87,8 @@ if (process.platform === 'linux') {
           
           let connectRes = '';
           try {
-            connectRes = cp.execSync('curl -s http://127.0.0.1:9333/json/version 2>&1').toString();
+            const fetchRes = await fetch('http://127.0.0.1:9333/json/version');
+            connectRes = await fetchRes.text();
           } catch (e) {
             connectRes = `Connection failed: ${e.message}`;
           }
@@ -113,9 +114,15 @@ if (process.platform === 'linux') {
             detached: true
           });
           await new Promise(r => setTimeout(r, 2000));
-          const res = cp.execSync('curl -s http://127.0.0.1:9444/json/version 2>&1 || echo "failed"').toString();
+          let res = '';
+          try {
+            const fetchRes = await fetch('http://127.0.0.1:9444/json/version');
+            res = await fetchRes.text();
+          } catch (e) {
+            res = `failed: ${e.message}`;
+          }
           proc.kill('SIGKILL');
-          testUserDirTmp = res.includes('DevTools') ? 'Success' : `Failed: ${res.trim()}`;
+          testUserDirTmp = res.includes('Browser') ? 'Success' : `Failed: ${res.trim()}`;
         } catch (e) {
           testUserDirTmp = `Error: ${e.message}`;
         }
@@ -135,9 +142,15 @@ if (process.platform === 'linux') {
             detached: true
           });
           await new Promise(r => setTimeout(r, 2000));
-          const res = cp.execSync('curl -s http://127.0.0.1:9555/json/version 2>&1 || echo "failed"').toString();
+          let res = '';
+          try {
+            const fetchRes = await fetch('http://127.0.0.1:9555/json/version');
+            res = await fetchRes.text();
+          } catch (e) {
+            res = `failed: ${e.message}`;
+          }
           proc.kill('SIGKILL');
-          testUserDirApp = res.includes('DevTools') ? 'Success' : `Failed: ${res.trim()}`;
+          testUserDirApp = res.includes('Browser') ? 'Success' : `Failed: ${res.trim()}`;
         } catch (e) {
           testUserDirApp = `Error: ${e.message}`;
         }
