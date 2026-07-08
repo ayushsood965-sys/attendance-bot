@@ -179,6 +179,11 @@ async function waitForLoginForm(page) {
       for (const inp of placeholders) {
         if (inp.type !== 'hidden') return true;
       }
+      // Check for buttons (login button)
+      const buttons = document.querySelectorAll('button, input[type="submit"], input[type="button"]');
+      for (const btn of buttons) {
+        if (btn.offsetParent !== null || btn.offsetWidth > 0) return true;
+      }
       return false;
     });
 
@@ -502,66 +507,58 @@ async function solveCaptchaOnPage(page, geminiModel) {
  * Click the LOGIN button using multiple strategies.
  */
 async function clickLoginButton(page) {
-  // Try to find and click the login button
-  const strategies = [
-    // By text content
-    async () => {
-      return await page.evaluate(() => {
-        const elements = document.querySelectorAll('input[type="submit"], button, input[type="button"], a');
-        for (const el of elements) {
-          const text = (el.value || el.textContent || '').trim().toUpperCase();
-          if (text === 'LOGIN' || text === 'SIGN IN' || text === 'LOG IN' || text === 'SUBMIT') {
-            el.click();
-            return true;
-          }
-        }
-        return false;
-      });
-    },
-    // By common selectors
-    async () => {
-      const selectors = [
-        'input[value*="Login" i]', 'input[value*="LOGIN"]',
-        'button:has-text("LOGIN")', 'button:has-text("Login")',
-        '#btnLogin', '#btnSubmit', '#Button1',
-        'input[type="submit"]', 'button[type="submit"]',
-        'input[id*="btnLogin" i]', 'input[id*="Login" i]',
-        'a[id*="btnLogin" i]',
-      ];
-      for (const sel of selectors) {
-        try {
-          const el = await page.$(sel);
-          if (el) {
-            // Use Promise.all to wait for navigation
-            await Promise.all([
-              page.waitForNavigation({ waitUntil: 'networkidle2', timeout: config.navigationTimeout }).catch(() => {}),
-              el.click(),
-            ]);
-            return true;
-          }
-        } catch (e) { /* continue */ }
-      }
-      return false;
-    },
-    // By pressing Enter in the last input field
-    async () => {
-      logger.info('  Trying Enter key as fallback...');
-      await page.keyboard.press('Enter');
-      await new Promise(r => setTimeout(r, 5000));
-      return true;
-    },
-  ];
-
-  for (const strategy of strategies) {
-    try {
-      const result = await strategy();
-      if (result) {
-        logger.info('  ✅ Login button clicked');
+  // Strategy 1: Click by text value (most reliable)
+  const clicked = await page.evaluate(() => {
+    const elements = document.querySelectorAll('input[type="submit"], button, input[type="button"], a');
+    for (const el of elements) {
+      const text = (el.value || el.textContent || '').trim().toUpperCase();
+      if (text.includes('LOGIN')) {
+        el.click();
         return true;
       }
-    } catch (e) {
-      // Try next strategy
     }
+    return false;
+  });
+  
+  if (clicked) {
+    logger.info('  ✅ Login button clicked via text match');
+    return true;
+  }
+
+  // Strategy 2: Click by common selectors
+  const selectors = [
+    'input[value*="Login" i]', 'input[value*="LOGIN"]',
+    'button:has-text("LOGIN")', 'button:has-text("Login")',
+    '#btnLogin', '#btnSubmit', '#Button1',
+    'input[type="submit"]', 'button[type="submit"]',
+    'input[id*="btnLogin" i]', 'input[id*="Login" i]',
+    'a[id*="btnLogin" i]',
+  ];
+  for (const sel of selectors) {
+    try {
+      const el = await page.$(sel);
+      if (el) {
+        // Check if visible
+        const isVisible = await page.evaluate(el => el.offsetParent !== null || el.offsetWidth > 0, el);
+        if (isVisible) {
+          await el.click().catch(() => {});
+          logger.info(`  ✅ Login button clicked via selector: ${sel}`);
+          return true;
+        }
+      }
+    } catch (e) { /* continue */ }
+  }
+  
+  // Strategy 3: Try pressing Enter in the last input field
+  logger.info('  Trying Enter key as fallback...');
+  await page.keyboard.press('Enter');
+  await new Promise(r => setTimeout(r, 3000));
+  
+  // Check if we navigated away from login page
+  const currentUrl = page.url();
+  if (!currentUrl.toLowerCase().includes('login')) {
+    logger.info('  ✅ Login succeeded via Enter key fallback');
+    return true;
   }
 
   return false;

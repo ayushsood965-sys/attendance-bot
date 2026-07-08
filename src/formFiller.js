@@ -328,6 +328,9 @@ async function fillForm(page, shift, taskData) {
   // Always use page directly — ASP.NET postbacks destroy iframe/frame references
   logger.info(`Filling form for ${shift} shift...`);
 
+  // Track if we're using Extra work option
+  let usedExtraWork = false;
+  
   try {
     // 1. Select Shift dropdown
     const shiftText = shift === 'morning'
@@ -336,38 +339,53 @@ async function fillForm(page, shift, taskData) {
 
     const shiftSelected = await selectDropdown(page, 'Shift', shiftText);
     if (!shiftSelected) {
-      logger.warn(`  ⚠️ Shift option "${shiftText}" not found. Attempting fallback to any available option...`);
-      const fallback = await page.evaluate(() => {
+      logger.warn(`  ⚠️ Shift option "${shiftText}" not found. Checking available options...`);
+      
+      // Check if "Extra work" option exists (available during off-hours)
+      const extraWorkResult = await page.evaluate(() => {
         const sel = document.querySelector('select[id*="Shift" i], select[id*="shift" i]');
         if (!sel) return { error: 'No shift select element found' };
-        for (let i = 0; i < sel.options.length; i++) {
-          const text = sel.options[i].text.trim().toLowerCase();
-          if (text && !text.includes('select') && !text.startsWith('-')) {
-            sel.selectedIndex = i;
-            sel.dispatchEvent(new Event('change', { bubbles: true }));
-            return { selected: sel.options[i].text.trim() };
+        const options = Array.from(sel.options).map(o => ({ text: o.text.trim(), value: o.value }));
+        for (let i = 0; i < options.length; i++) {
+          const text = options[i].text.toLowerCase();
+          if (text.includes('extra work') || text.includes('extrawork') || text.includes('extra')) {
+            return { success: true, selected: options[i].text, index: i };
           }
         }
-        return { error: 'No non-default options available', available: Array.from(sel.options).map(o => o.text.trim()) };
+        return { error: 'No Extra work option found', available: options.map(o => o.text) };
       });
 
-      if (fallback.error) {
-        logger.warn(`  ⚠️ ${fallback.error} (available: ${fallback.available?.join(', ')}). Skipping due to portal time constraints.`);
+      if (extraWorkResult.success) {
+        // Select Extra work during off-hours - still fill the form but with this option
+        const shiftOptionSelected = await page.evaluate((idx) => {
+          const sel = document.querySelector('select[id*="Shift" i], select[id*="shift" i]');
+          sel.selectedIndex = idx;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          return sel.options[idx].text;
+        }, extraWorkResult.index);
+        logger.info(`  ✅ Selected "${shiftOptionSelected}" (Extra work during off-hours)`);
+        usedExtraWork = true;
+        // Continue with form filling - Extra work still requires filling other fields
+      } else {
+        logger.warn(`  ⚠️ ${extraWorkResult.error} (available: ${extraWorkResult.available?.join(',')}). This is expected during off-shift hours.`);
+        // Return true to indicate we handled this gracefully - no need to retry
         return true;
       }
-      logger.info(`  ✅ Fallback: selected "${fallback.selected}" instead of "${shiftText}"`);
     }
 
-    // Wait for ASP.NET postback after shift change — this is the critical part
-    // The shift dropdown triggers a full postback that can destroy frame references
-    await humanDelay(2000, 3000);
-    // Wait for page to stabilize after postback
-    await page.waitForFunction(() => {
-      const selects = document.querySelectorAll('select');
-      return selects.length >= 2;
-    }, { timeout: 15000 }).catch(() => {});
-    await humanDelay(500, 1000);
-    logger.info('  Post-shift postback settled');
+    // Wait for ASP.NET postback after shift change (only if we selected a real shift)
+    // Extra work option doesn't trigger postback like Morning/Evening do
+    if (!usedExtraWork) {
+      logger.info('  Waiting for postback after shift selection...');
+      await humanDelay(2000, 3000);
+      // Wait for page to stabilize after postback
+      await page.waitForFunction(() => {
+        const selects = document.querySelectorAll('select');
+        return selects.length >= 2;
+      }, { timeout: 15000 }).catch(() => {});
+      await humanDelay(500, 1000);
+      logger.info('  Post-shift postback settled');
+    }
     await takeScreenshot(page, 'after_shift_select');
 
     // 2. Select Work Type dropdown

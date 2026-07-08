@@ -37,7 +37,8 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     NODE_ENV=production \
     HOME=/app \
     XDG_CONFIG_HOME=/app/.config \
-    XDG_CACHE_HOME=/app/.cache
+    XDG_CACHE_HOME=/app/.cache \
+    DRY_RUN=false
 
 # Create app directory
 WORKDIR /app
@@ -67,4 +68,4 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
     CMD node -e "console.log('healthy')" || exit 1
 
 # Start the application
-CMD ["node", "src/index.js", "--run-now", "--dry-run"]
+CMD ["node", "src/index.js"]

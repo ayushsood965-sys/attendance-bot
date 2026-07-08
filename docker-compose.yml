@@ -9,6 +9,7 @@ services:
       - TZ=Asia/Kolkata
       - NODE_ENV=production
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      - DRY_RUN=false
     volumes:
       - ./logs:/app/logs
       - ./screenshots:/app/screenshots

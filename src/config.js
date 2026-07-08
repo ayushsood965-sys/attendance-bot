@@ -49,6 +49,7 @@ const config = {
     shift: {
       morning: 'Morning',
       evening: 'Evening',
+      extra: 'Extra work',
     },
     workType: 'Programmer',
     activityStatus: 'Completed',
