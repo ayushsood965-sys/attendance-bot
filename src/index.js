@@ -5,6 +5,17 @@ const logger = require('./logger');
 const { startScheduler, executeTask } = require('./scheduler');
 const { closeBrowser } = require('./browser');
 
+// Start a simple HTTP health check server on Linux to satisfy Coolify/Traefik routing checks
+if (process.platform === 'linux') {
+  const http = require('http');
+  http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('healthy');
+  }).listen(process.env.PORT || 3000, () => {
+    logger.info(`Health check server listening on port ${process.env.PORT || 3000}`);
+  });
+}
+
 // Parse CLI arguments
 const args = process.argv.slice(2);
 const runNow = args.includes('--run-now');
