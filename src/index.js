@@ -85,26 +85,23 @@ async function main() {
     logger.info(`🏃 Running ${shift} shift task immediately...`);
 
     try {
-      const success = await executeTask(shift);
+      await executeTask(shift);
 
       // If --run-now, run both shifts
       if (runNow && !runMorning && !runEvening) {
         logger.info('Running evening shift as well (--run-now mode)...');
         await executeTask('evening');
       }
-
-      process.exit(success ? 0 : 1);
     } catch (error) {
       logger.error('Immediate execution failed:', error);
-      process.exit(1);
     }
-  } else {
-    // Scheduler mode (default)
-    startScheduler();
-
-    // Keep the process alive
-    logger.info('Process running. Press Ctrl+C to stop.');
   }
+
+  // Scheduler mode (always keep running)
+  startScheduler();
+
+  // Keep the process alive
+  logger.info('Process running. Press Ctrl+C to stop.');
 }
 
 // Graceful shutdown
