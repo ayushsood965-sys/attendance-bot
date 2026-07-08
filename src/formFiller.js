@@ -281,8 +281,8 @@ async function findAndInteractWithMasters(page) {
  * Fill and submit the Daily Task form.
  */
 async function fillForm(page, shift, taskData) {
-  const context = formFrame || page;
-  logger.info(`Filling form in context: ${context === page ? 'main page' : 'iframe'} for ${shift} shift...`);
+  // Always use page directly — ASP.NET postbacks destroy iframe/frame references
+  logger.info(`Filling form for ${shift} shift...`);
 
   try {
     // 1. Select Shift dropdown
@@ -290,16 +290,12 @@ async function fillForm(page, shift, taskData) {
       ? config.dropdownValues.shift.morning
       : config.dropdownValues.shift.evening;
 
-    const shiftSelected = await selectDropdown(context, 'Shift', shiftText);
+    const shiftSelected = await selectDropdown(page, 'Shift', shiftText);
     if (!shiftSelected) {
-      // The desired shift option is not in the dropdown — try to select
-      // any available non-default option (e.g. "Extra work") so the form
-      // can still be submitted.
       logger.warn(`  ⚠️ Shift option "${shiftText}" not found. Attempting fallback to any available option...`);
-      const fallback = await context.evaluate(() => {
+      const fallback = await page.evaluate(() => {
         const sel = document.querySelector('select[id*="Shift" i], select[id*="shift" i]');
         if (!sel) return { error: 'No shift select element found' };
-        // Pick first option whose text is not the default placeholder
         for (let i = 0; i < sel.options.length; i++) {
           const text = sel.options[i].text.trim().toLowerCase();
           if (text && !text.includes('select') && !text.startsWith('-')) {
@@ -313,40 +309,80 @@ async function fillForm(page, shift, taskData) {
 
       if (fallback.error) {
         logger.warn(`  ⚠️ ${fallback.error} (available: ${fallback.available?.join(', ')}). Skipping due to portal time constraints.`);
-        return true; // Exit cleanly — portal time window issue
+        return true;
       }
       logger.info(`  ✅ Fallback: selected "${fallback.selected}" instead of "${shiftText}"`);
     }
+
+    // Wait for ASP.NET postback after shift change — this is the critical part
+    // The shift dropdown triggers a full postback that can destroy frame references
+    await humanDelay(2000, 3000);
+    // Wait for page to stabilize after postback
+    await page.waitForFunction(() => {
+      const selects = document.querySelectorAll('select');
+      return selects.length >= 2;
+    }, { timeout: 15000 }).catch(() => {});
     await humanDelay(500, 1000);
-    // Wait for possible ASP.NET postback after shift change
-    await waitForPostback(context);
+    logger.info('  Post-shift postback settled');
+    await takeScreenshot(page, 'after_shift_select');
 
     // 2. Select Work Type dropdown
-    const workSelected = await selectDropdown(context, 'Work', config.dropdownValues.workType);
+    logger.info('  Selecting Work Type...');
+    const workSelected = await selectDropdown(page, 'Work', config.dropdownValues.workType);
     if (!workSelected) {
-      throw new Error(`Failed to select Work Type dropdown (option "${config.dropdownValues.workType}" not found)`);
+      // Try partial match
+      logger.warn('  Work Type "Programmer" not found, trying partial match...');
+      const workFallback = await page.evaluate(() => {
+        const selects = document.querySelectorAll('select');
+        for (const sel of selects) {
+          const id = (sel.id || '').toLowerCase();
+          const name = (sel.name || '').toLowerCase();
+          if (id.includes('work') || name.includes('work')) {
+            for (let i = 0; i < sel.options.length; i++) {
+              const t = sel.options[i].text.trim().toLowerCase();
+              if (t && !t.includes('select') && !t.startsWith('-')) {
+                sel.selectedIndex = i;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+                return { selected: sel.options[i].text.trim() };
+              }
+            }
+          }
+        }
+        return { error: 'No work type dropdown found' };
+      });
+      if (workFallback.error) {
+        logger.warn(`  ⚠️ ${workFallback.error}`);
+      } else {
+        logger.info(`  ✅ Work Type fallback: selected "${workFallback.selected}"`);
+      }
     }
     await humanDelay(500, 1000);
 
     // 3. Fill Maximum Hours
-    await fillTextField(context, 'Hour', taskData.maxHours);
+    logger.info('  Filling Maximum Hours...');
+    await fillTextField(page, 'Hour', taskData.maxHours);
     await humanDelay(300, 600);
 
     // 4. Fill Description of Activity
-    let descFilled = await fillTextField(context, 'Description', taskData.description);
-    if (!descFilled) descFilled = await fillTextField(context, 'Activity', taskData.description);
+    logger.info('  Filling Description...');
+    let descFilled = await fillTextField(page, 'Description', taskData.description);
+    if (!descFilled) descFilled = await fillTextField(page, 'Activity', taskData.description);
     if (!descFilled) {
-      await fillTextarea(context, taskData.description);
+      await fillTextarea(page, taskData.description);
     }
     await humanDelay(300, 600);
 
     // 5. Select Activity Status
-    await selectDropdown(context, 'Status', config.dropdownValues.activityStatus);
+    logger.info('  Selecting Activity Status...');
+    await selectDropdown(page, 'Status', config.dropdownValues.activityStatus);
     await humanDelay(300, 600);
 
-    // 6. Fill Remarks
-    await fillTextField(context, 'Remark', taskData.remarks);
-    await humanDelay(300, 600);
+    // 6. Fill Remarks (skip if empty)
+    if (taskData.remarks) {
+      logger.info('  Filling Remarks...');
+      await fillTextField(page, 'Remark', taskData.remarks);
+      await humanDelay(300, 600);
+    }
 
     await takeScreenshot(page, `form_filled_${shift}`);
 
@@ -358,23 +394,29 @@ async function fillForm(page, shift, taskData) {
 
     // 8. Click ADD button
     logger.info('Clicking ADD button...');
-    let addClicked = await clickButtonByText(context, 'ADD');
-    if (!addClicked) addClicked = await clickButtonByText(context, 'Save');
-    if (!addClicked) addClicked = await clickButtonByText(context, 'Submit');
+    let addClicked = await clickButtonByText(page, 'ADD');
+    if (!addClicked) addClicked = await clickButtonByText(page, 'Add');
+    if (!addClicked) addClicked = await clickButtonByText(page, 'Save');
+    if (!addClicked) addClicked = await clickButtonByText(page, 'Submit');
 
     if (!addClicked) {
       throw new Error('Could not find ADD/Save/Submit button');
     }
 
-    // Wait for AJAX postback to update the GridView after adding
-    await handleNavigation(page);
-    await waitForPostback(context);
-    await humanDelay(1500, 2500);
+    // Wait for AJAX postback after ADD
+    await humanDelay(3000, 5000);
+    await page.waitForFunction(() => {
+      const selects = document.querySelectorAll('select');
+      return selects.length >= 1;
+    }, { timeout: 10000 }).catch(() => {});
+    await humanDelay(1000, 2000);
+
+    await takeScreenshot(page, `after_add_${shift}`);
 
     // 9. Tick the "Final Submit" checkbox
     logger.info('Checking the "Final Submit" checkbox...');
-    const finalSubmitChecked = await context.evaluate(() => {
-      const chk = document.querySelector('input[type="checkbox"][id*="Submit" i], input[type="checkbox"][id*="submit" i]');
+    const finalSubmitChecked = await page.evaluate(() => {
+      const chk = document.querySelector('input[type="checkbox"][id*="Submit" i], input[type="checkbox"][id*="submit" i], input[type="checkbox"][id*="Final" i], input[type="checkbox"][id*="final" i]');
       if (chk) {
         if (!chk.checked) {
           chk.click();
@@ -393,23 +435,21 @@ async function fillForm(page, shift, taskData) {
 
     // 10. Click the "SAVE" button to final submit
     logger.info('Clicking final SAVE button...');
-    let saveClicked = await clickButtonByText(context, 'SAVE');
-    if (!saveClicked) saveClicked = await clickButtonByText(context, 'Save');
+    let saveClicked = await clickButtonByText(page, 'SAVE');
+    if (!saveClicked) saveClicked = await clickButtonByText(page, 'Save');
+    if (!saveClicked) saveClicked = await clickButtonByText(page, 'Final Save');
     
     if (saveClicked) {
       logger.info('  ✅ final SAVE button clicked');
     } else {
-      throw new Error('Could not find final SAVE button');
+      logger.warn('  ⚠️ Could not find final SAVE button — ADD may have been sufficient');
     }
 
-    await handleNavigation(page);
-    await waitForPostback(context);
-    await humanDelay(2000, 3000);
-
+    await humanDelay(3000, 5000);
     await takeScreenshot(page, `form_submitted_${shift}`);
 
     // 11. Verify success
-    const success = await verifySubmission(context);
+    const success = await verifySubmission(page);
     if (success) {
       logger.info(`✅ ${shift.toUpperCase()} shift task submitted and saved successfully!`);
     } else {
