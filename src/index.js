@@ -26,6 +26,19 @@ if (process.platform === 'linux') {
       }
       return;
     }
+    if (req.url === '/status') {
+      try {
+        const cp = require('child_process');
+        const processes = cp.execSync('ps aux 2>&1 || ps -ef 2>&1').toString();
+        const tmpFiles = cp.execSync('ls -la /tmp /tmp/.X11-unix 2>&1').toString();
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end(`Processes:\n${processes}\n\nFiles:\n${tmpFiles}`);
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`Error: ${e.message}`);
+      }
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('healthy');
   }).listen(process.env.PORT || 3000, () => {
