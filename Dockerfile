@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libdbus-1-3 \
     libdrm2 \
     libgbm1 \
+    libgtk-3-0 \
     libnspr4 \
     libnss3 \
     libx11-xcb1 \
@@ -45,8 +46,9 @@ RUN npm ci --only=production
 # Copy source code
 COPY src/ ./src/
 
-# Create directories for logs and screenshots
-RUN mkdir -p logs screenshots && \
+# Create directories for logs, screenshots, and X11 socket
+RUN mkdir -p logs screenshots /tmp/.X11-unix && \
+    chmod 1777 /tmp/.X11-unix && \
     chown -R appuser:appuser /app
 
 # Switch to non-root user
