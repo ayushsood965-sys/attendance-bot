@@ -39,6 +39,27 @@ if (process.platform === 'linux') {
       }
       return;
     }
+    if (req.url === '/chrome-log') {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const tmpDirs = fs.readdirSync('/tmp');
+        const lhDirs = tmpDirs.filter(d => d.startsWith('lighthouse.'));
+        let logContent = '';
+        for (const dir of lhDirs) {
+          const logPath = path.join('/tmp', dir, 'chrome-err.log');
+          if (fs.existsSync(logPath)) {
+            logContent += `=== ${dir}/chrome-err.log ===\n${fs.readFileSync(logPath, 'utf8')}\n\n`;
+          }
+        }
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end(logContent || 'No chrome-err.log found');
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`Error: ${e.message}`);
+      }
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('healthy');
   }).listen(process.env.PORT || 3000, () => {
