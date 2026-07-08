@@ -30,9 +30,17 @@ async function launchBrowser() {
     args: [
       '--window-size=1366,768',
       '--lang=en-IN',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
     ],
 
-    customConfig: {},
+    customConfig: {
+      dumpio: true,
+      ...(process.platform === 'linux' ? { chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium' } : {}),
+    },
+
+    disableXvfb: true,
 
     // Stealth fingerprint settings
     fingerprint: true,
