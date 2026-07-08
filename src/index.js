@@ -179,13 +179,48 @@ async function main() {
       diagWarn(`Failed to get chromium version: ${e.message}`);
     }
 
-    // Try starting a test Xvfb and chromium to see why it crashes
+    // Try starting a test Chromium on DISPLAY to see why it fails
     try {
-      diagLog('Testing manual chromium launch...');
-      const output = cp.execSync('chromium --headless --no-sandbox --disable-gpu --dump-dom https://www.google.com 2>&1').toString();
-      diagLog(`Test chromium headless fetch succeeded! Length: ${output.length}`);
+      diagLog('Testing manual chromium launch on active display...');
+      const displays = fs.readdirSync('/tmp/.X11-unix').map(f => f.replace('X', ':'));
+      const activeDisplay = displays.length > 0 ? displays[0] : ':99';
+      diagLog(`Found active X11 displays: ${displays.join(', ')}. Using ${activeDisplay}`);
+
+      const proc = cp.spawn('chromium', [
+        '--no-sandbox',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--remote-debugging-port=9222',
+        '--remote-debugging-address=0.0.0.0',
+        'about:blank'
+      ], {
+        env: { ...process.env, DISPLAY: activeDisplay },
+        detached: true
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      proc.stdout.on('data', d => { stdout += d.toString(); });
+      proc.stderr.on('data', d => { stderr += d.toString(); });
+
+      // Wait 5 seconds
+      await new Promise(r => setTimeout(r, 5000));
+      
+      // Try connecting to debug port
+      try {
+        const res = cp.execSync('curl -s http://127.0.0.1:9222/json/version 2>&1').toString();
+        diagLog(`Successfully connected to manual chromium debug port! Response:\n${res}`);
+      } catch (e) {
+        diagWarn(`Failed to connect to manual chromium debug port: ${e.message}`);
+      }
+
+      // Kill the process
+      proc.kill('SIGKILL');
+      
+      diagLog(`Manual chromium stdout:\n${stdout}`);
+      diagLog(`Manual chromium stderr:\n${stderr}`);
     } catch (e) {
-      diagWarn(`Test chromium headless fetch failed: ${e.message}\nOutput: ${e.stdout?.toString() || e.stderr?.toString()}`);
+      diagWarn(`Manual chromium launch test failed: ${e.message}`);
     }
   } catch (err) {
     diagLog(`Diagnostics error: ${err.message}`);
